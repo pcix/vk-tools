@@ -14,28 +14,46 @@ function getAudioIds() {
     return ids;
 }
 
-function getRecords(ids) {
+function getRecords(ids, callback) {
     var records = [];
+    var expectedLength = ids.length;
+    var count = Math.ceil(ids.length / bulkSize);
+
     while (ids.length > 0) {
         var bulk = [];
         while (bulk.length < bulkSize && ids.length > 0) bulk.push(ids.pop());
 
-        // TODO: Async
         var http = new XMLHttpRequest();
         var params = 'act=reload_audio&al=1&ids=' + bulk.join(',');
-        http.open('POST', audioUrl, false);
+        http.open('POST', audioUrl, true);
         http.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-        http.send(params);
-        if (http.status == 200) {
-            var serverRecords = parseResponse(http.responseText);
-            for (var i = 0; i < serverRecords.length; i++) {
-                var serverRecord = serverRecords[i];
-                records.push({
-                    filename: serverRecord[4] + ' - ' + serverRecord[3],
-                    url: e(serverRecord[2])
-                });
+        http.onload = function () {
+            if (this.readyState === 4) {
+                count--;
+                if (this.status == 200) {
+                    var serverRecords = parseResponse(this.responseText);
+                    // TODO: Handle retry if !serverRecords
+                    for (var i = 0; i < serverRecords.length; i++) {
+                        var serverRecord = serverRecords[i];
+                        records.push({
+                            filename: serverRecord[4] + ' - ' + serverRecord[3],
+                            url: e(serverRecord[2])
+                        });
+                    }
+
+                    if (records.length == expectedLength || count == 0) {
+                        console.log('Loaded', records.length, 'records');
+                        callback(records);
+                    }
+                }
             }
-        }
+        };
+        http.onerror = function () {
+            count--;
+            console.error(this.statusText);
+        };
+        http.send(params);
+
     }
     return records;
 }
@@ -56,7 +74,7 @@ function parseResponse(response) {
 function addDownloadPlaylistButton() {
     var a = document.createElement('a');
     var downloadText = document.createTextNode('Download playlist');
-    a.setAttribute('id', 'download-music');
+    a.setAttribute('id', 'download_music');
     a.setAttribute('class', 'flat_button');
     a.setAttribute('style', 'width: 100%');
     a.appendChild(downloadText);
@@ -65,23 +83,29 @@ function addDownloadPlaylistButton() {
     insertAfter(parent, a);
 
     a.onclick = function () {
-        createPlaylist();
+        getRecords(getAudioIds(), createPlaylist);
     };
 }
 
-function createPlaylist() {
-    var records = getRecords(getAudioIds());
+function createPlaylist(records) {
     var playlist = "#EXTM3U";
     for (var i = 0; i < records.length; i++) {
         playlist += "\n\n#EXTINF:-1," + records[i].filename;
         playlist += "\n" + records[i].url;
     }
-    var blob = new Blob([playlist], {type : 'text/plain; charset=utf-8'});
+    var blob = new Blob([playlist], {type : 'text/plain'});
     var url = URL.createObjectURL(blob);
+    var filename = 'playlist.m3u';
 
-    var a = document.getElementById('download-music');
+    var a = document.createElement('a');
+    document.body.appendChild(a);
     a.setAttribute('href', url);
-    a.setAttribute('download', 'playlist.m3u');
+    a.setAttribute('style', 'display: none');
+    a.setAttribute('download', filename);
+
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
 }
 
 function errorHandler(error) {
