@@ -5,17 +5,18 @@ function insertAfter(referenceNode, newNode) {
     referenceNode.parentNode.insertBefore(newNode, referenceNode.nextSibling);
 }
 
-function getAudioIds() {
-    var ids = [];
+function getIdMap() {
+    var map = {};
     var records = document.getElementsByClassName('audio_row');
     for (var i = 0; i < records.length; i++) {
-        ids.push(records[i].id.replace('audio_',''));
+        map[records[i].id.replace('audio_','')] = JSON.parse(records[i].getAttribute('data-audio'));
     }
-    return ids;
+    return map;
 }
 
-function getRecords(ids, callback) {
+function getRecords(idsMap, ids, callback) {
     var records = [];
+    var failedIds = [];
     var expectedLength = ids.length;
     var count = Math.ceil(ids.length / bulkSize);
 
@@ -23,16 +24,43 @@ function getRecords(ids, callback) {
         var bulk = [];
         while (bulk.length < bulkSize && ids.length > 0) bulk.push(ids.pop());
 
-        var http = new XMLHttpRequest();
-        var params = 'act=reload_audio&al=1&ids=' + bulk.join(',');
-        http.open('POST', audioUrl, true);
-        http.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-        http.onload = function () {
-            if (this.readyState === 4) {
-                count--;
-                if (this.status == 200) {
-                    var serverRecords = parseResponse(this.responseText);
-                    // TODO: Handle retry if !serverRecords
+        requestUrls(bulk, function (newRecords, err) {
+            count--;
+            if (!err) {
+                records = records.concat(newRecords);
+            } else {
+                if (Array.isArray(err)) {
+                    for (var j = 0; j < err.length; j++) {
+                        failedIds.push(err[j]);
+                        console.warn('Cannot get link to:', idsMap[err[j]]);
+                    }
+                } else {
+                    console.error(err);
+                }
+            }
+
+            if (records.length == expectedLength || count == 0) {
+                console.log('Loaded', records.length + '/' + expectedLength, 'records');
+                callback(records, failedIds);
+            }
+        });
+    }
+}
+
+function requestUrls(ids, callback) {
+    var http = new XMLHttpRequest();
+    var params = 'act=reload_audio&al=1&ids=' + ids.join(',');
+    http.open('POST', audioUrl, true);
+    http.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+    http.onload = function () {
+        if (this.readyState === 4) {
+            if (this.status == 200) {
+                var serverRecords = parseResponse(this.responseText);
+                if (!!serverRecords) {
+                    var records = [];
+                    if (serverRecords.length != ids.length) {
+                        console.warn('Returned only', serverRecords.length, 'instead of', ids.length);
+                    }
                     for (var i = 0; i < serverRecords.length; i++) {
                         var serverRecord = serverRecords[i];
                         records.push({
@@ -40,22 +68,17 @@ function getRecords(ids, callback) {
                             url: e(serverRecord[2])
                         });
                     }
-
-                    if (records.length == expectedLength || count == 0) {
-                        console.log('Loaded', records.length, 'records');
-                        callback(records);
-                    }
+                    callback(records);
+                } else {
+                    callback([], ids);
                 }
             }
-        };
-        http.onerror = function () {
-            count--;
-            console.error(this.statusText);
-        };
-        http.send(params);
-
-    }
-    return records;
+        }
+    };
+    http.onerror = function () {
+        callback([], this.statusText);
+    };
+    http.send(params);
 }
 
 function parseResponse(response) {
@@ -83,7 +106,10 @@ function addDownloadPlaylistButton() {
     insertAfter(parent, a);
 
     a.onclick = function () {
-        getRecords(getAudioIds(), createPlaylist);
+        var map = getIdMap();
+        getRecords(map, Object.keys(map), function (ok, failed) {
+            createPlaylist(ok);
+        });
     };
 }
 
