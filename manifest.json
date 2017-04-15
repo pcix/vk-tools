@@ -1,0 +1,27 @@
+{
+  "manifest_version": 2,
+
+  "name": "VK Music Downloader",
+  "description": "Download play lists",
+  "version": "1.0",
+
+  "browser_action": {
+    "default_icon": "logo.ico"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.vk.com/*"],
+      "js": [
+        "content_scripts/updateUI.js",
+        "content_scripts/vk.js"
+      ]
+    }
+  ],
+  "background": {
+    "scripts": ["download.js"]
+  },
+  "permissions": [
+    "activeTab", "https://ajax.googleapis.com/",
+    "downloads"
+  ]
+}
