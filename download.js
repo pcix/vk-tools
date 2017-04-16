@@ -94,17 +94,20 @@ function loadChunk(ids, callback, retry) {
     http.send(params);
 }
 
+function loadChunks(chunks, totalSize, callback) {
+    var chunk = chunks.pop();
+    console.log('Load', totalSize - chunks.length, 'chunk from', totalSize);
+    loadChunk(chunk, function(chunkResult) {
+        callback(chunkResult);
+        if (chunks.length > 0) {
+            loadChunks(chunks, totalSize, callback);
+        }
+    });
+}
+
 function loadRecords(ids, callback) {
     var chunks = splitIds(ids, bulkSize);
-    var totalSize = chunks.length;
-    while (chunks.length > 0) {
-        var chunk = chunks.pop();
-        console.log('Load', totalSize - chunks.length, 'chunk from', totalSize);
-
-        loadChunk(chunk, function(chunkResult) {
-            callback(chunkResult);
-        });
-    }
+    loadChunks(chunks, chunks.length, callback);
 }
 
 function getOwner() {
