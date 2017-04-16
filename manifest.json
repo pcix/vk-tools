@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
 
-  "name": "VK Music Downloader",
+  "name": "VK Tools",
   "description": "Download play lists",
   "version": "1.0",
 
@@ -12,14 +12,11 @@
     {
       "matches": ["*://*.vk.com/*"],
       "js": [
-        "content_scripts/updateUI.js",
-        "content_scripts/vk.js"
+        "download.js",
+        "vk.js"
       ]
     }
   ],
-  "background": {
-    "scripts": ["download.js"]
-  },
   "permissions": [
     "activeTab", "https://ajax.googleapis.com/",
     "downloads"
