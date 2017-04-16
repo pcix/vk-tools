@@ -198,6 +198,8 @@ function createPlaylist(records) {
 }
 
 function addMusicButtons() {
+    if (!isMusicPage()) return;
+
     var a = document.createElement('a');
     var downloadText = document.createTextNode('Download playlist');
     a.setAttribute('id', 'download_music');
@@ -205,8 +207,10 @@ function addMusicButtons() {
     a.setAttribute('style', 'width: 100%');
     a.appendChild(downloadText);
 
-    var firstRow = document.getElementsByClassName('audio_row')[0];
-    insertBefore(firstRow, a);
+    setTimeout(function() {
+        var firstRow = document.getElementsByClassName('audio_row')[0];
+        insertBefore(firstRow, a)
+    }, 1000);
 
     a.onclick = function() {
         if (a.className.indexOf('secondary') != -1) {
@@ -227,6 +231,21 @@ function isMusicPage() {
     return !!getOwner();
 }
 
-if (isMusicPage()) {
-    addMusicButtons();
+function urlHandler() {
+    this.oldUrl = document.URL;
+
+    var that = this;
+    var detect = function(){
+        if (that.oldUrl != document.URL) {
+            that.oldUrl = document.URL;
+            addMusicButtons();
+        }
+    };
+
+    setInterval(function () {
+        detect()
+    }, 100);
 }
+
+addMusicButtons();
+var urlDetection = new urlHandler();
