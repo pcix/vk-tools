@@ -112,7 +112,7 @@ function loadRecords(ids, callback) {
 
 function getOwner() {
     var ownAlbum = /.*\/audios(\d+)$/g;
-    var friendAlbum = /.*\/audios\d+\?friend=(\d+)$/g;
+    var friendAlbum = /.*\/audios\d+\?friend=(\d+)(&.*)?$/g;
     var matchers = [ownAlbum, friendAlbum];
     for (var i = 0; i < matchers.length; i++) {
         var match = matchers[i].exec(document.URL);
