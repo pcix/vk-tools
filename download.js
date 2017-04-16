@@ -64,30 +64,34 @@ function splitIds(ids, size) {
 }
 
 function loadChunk(ids, callback, retry) {
-    console.log('Load chunk:', ids);
     var http = new XMLHttpRequest();
     var params = 'act=reload_audio&al=1&ids=' + ids.join(',');
-    http.open('POST', audioUrl, false);
+    http.open('POST', audioUrl, true);
     http.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-    http.send(params);
-    if (http.status == 200) {
-        var records = [];
-        var serverRecords = parseResponse(http.responseText);
-        if (!!serverRecords) {
-            for (var i = 0; i < serverRecords.length; i++) {
-                var serverRecord = serverRecords[i];
-                records.push({
-                    filename: serverRecord[4] + ' - ' + serverRecord[3],
-                    url: e(serverRecord[2])
-                });
+    http.onload = function () {
+        if (this.readyState === 4 && this.status == 200) {
+            var records = [];
+            var serverRecords = parseResponse(this.responseText);
+            if (!!serverRecords) {
+                for (var i = 0; i < serverRecords.length; i++) {
+                    var serverRecord = serverRecords[i];
+                    records.push({
+                        filename: serverRecord[4] + ' - ' + serverRecord[3],
+                        url: e(serverRecord[2])
+                    });
+                }
+                callback(records);
+            } else {
+                if (!retry) retry = 1;
+                console.log('[' + retry + '] Failed to download chunk:', ids);
+                setTimeout(loadChunk.bind(null, ids, callback, retry + 1), pause);
             }
-            callback(records);
-        } else {
-            if (!retry) retry = 1;
-            console.log('[' + retry + '] Failed to download chunk:', ids);
-            setTimeout(loadChunk.bind(null, ids, callback, retry + 1), pause);
         }
-    }
+    };
+    http.onerror = function (err) {
+        callback(null, err);
+    };
+    http.send(params);
 }
 
 function loadRecords(ids, callback) {
