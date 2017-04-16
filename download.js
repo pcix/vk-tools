@@ -1,6 +1,7 @@
 var baseUrl = 'https://vk.com';
 var audioUrl = baseUrl + '/al_audio.php';
 var bulkSize = 5;
+var pause = 60000;
 
 function insertBefore(referenceNode, newNode) {
     referenceNode.parentNode.insertBefore(newNode, referenceNode);
@@ -62,7 +63,7 @@ function splitIds(ids, size) {
     return chunks;
 }
 
-function loadChunk(ids, callback) {
+function loadChunk(ids, callback, retry) {
     console.log('Load chunk:', ids);
     var http = new XMLHttpRequest();
     var params = 'act=reload_audio&al=1&ids=' + ids.join(',');
@@ -82,8 +83,9 @@ function loadChunk(ids, callback) {
             }
             callback(records);
         } else {
-            console.log('Failed chunk:', ids);
-            setTimeout(loadChunk.bind(null, ids, callback), 60000);
+            if (!retry) retry = 1;
+            console.log('[' + retry + '] Failed to download chunk:', ids);
+            setTimeout(loadChunk.bind(null, ids, callback, retry + 1), pause);
         }
     }
 }
