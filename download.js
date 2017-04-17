@@ -167,14 +167,14 @@ function downloadAlbum(progressCallback, callback) {
                 progressCallback(totalLoaded, total);
                 if (totalLoaded == total) {
                     console.log('Downloaded', music.length, 'records in', Date.now() - start, 'ms');
-                    callback(music);
+                    callback(album.title, music);
                 }
             });
         }
     });
 }
 
-function createPlaylist(records) {
+function createPlaylist(title, records) {
     var playlist = "#EXTM3U";
     for (var i = 0; i < records.length; i++) {
         playlist += "\n\n#EXTINF:-1," + records[i].filename;
@@ -182,7 +182,7 @@ function createPlaylist(records) {
     }
     var blob = new Blob([playlist], {type : 'text/plain'});
     var url = URL.createObjectURL(blob);
-    var filename = 'playlist.m3u';
+    var filename = fixFilename(title + '.m3u');
 
     var a = document.createElement('a');
     document.body.appendChild(a);
@@ -218,8 +218,8 @@ function addMusicButtons() {
         a.className = 'flat_button secondary';
         downloadAlbum(function (loaded, total) {
             console.log('Downloading playlist... (' + loaded + '/' + total + ')');
-        }, function (music) {
-            createPlaylist(music);
+        }, function (title, music) {
+            createPlaylist(title, music);
             a.className = 'flat_button';
         });
     };
