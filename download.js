@@ -55,10 +55,8 @@ function parseResponse(response) {
 
 function splitIds(ids, size) {
     var chunks = [];
-    while (ids.length > 0) {
-        var chunk = [];
-        while (chunk.length < size && ids.length > 0) chunk.push(ids.pop());
-        chunks.push(chunk);
+    for (var i = 0; i < ids.length; i += size) {
+        chunks.push(ids.slice(i, i + size));
     }
     return chunks;
 }
@@ -95,7 +93,7 @@ function loadChunk(ids, callback, retry) {
 }
 
 function loadChunks(chunks, totalSize, callback) {
-    var chunk = chunks.pop();
+    var chunk = chunks.shift();
     console.log('Load', totalSize - chunks.length, 'chunk from', totalSize);
     loadChunk(chunk, function(chunkResult) {
         callback(chunkResult);
