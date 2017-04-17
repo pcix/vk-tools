@@ -31,15 +31,6 @@ unescapeHTML.replacements = {
     "&gt;": ">"
 };
 
-function getIdMap() {
-    var map = {};
-    var records = document.getElementsByClassName('audio_row');
-    for (var i = 0; i < records.length; i++) {
-        map[records[i].id.replace('audio_','')] = JSON.parse(records[i].getAttribute('data-audio'));
-    }
-    return map;
-}
-
 function parseResponse(response) {
     var startIndex = response.indexOf('<!json>') + 7;
     if (startIndex == 6) {
@@ -108,29 +99,14 @@ function loadRecords(ids, callback) {
     loadChunks(chunks, chunks.length, callback);
 }
 
-function getOwner() {
-    var ownAlbum = /.*\/audios(\d+)$/g;
-    var friendAlbum = /.*\/audios\d+\?friend=(\d+)(&.*)?$/g;
-    var matchers = [ownAlbum, friendAlbum];
-    for (var i = 0; i < matchers.length; i++) {
-        var match = matchers[i].exec(document.URL);
-        if (match) {
-            return match[1];
-        }
-    }
-    return null;
-}
-
-function loadAlbum(callback) {
-    var ownerId = getOwner();
-    if (!ownerId) {
-        callback(null, 'Unknown page');
-        return;
-    }
-
+function repeatAlbumRequest(requestBody, callback) {
     var http = new XMLHttpRequest();
-    // TODO: album_id ??
-    var params = 'act=load_silent&al=1&band=false&album_id=-2&owner_id=' + ownerId;
+    var params = '';
+    var keys = Object.keys(requestBody.formData);
+    for (var i = 0; i < keys.length; i++) {
+        if (i > 0) params += '&';
+        params += keys[i] + '=' + requestBody.formData[keys[i]];
+    }
     http.open('POST', audioUrl, true);
     http.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
     http.onload = function () {
@@ -144,32 +120,24 @@ function loadAlbum(callback) {
     http.send(params);
 }
 
-function downloadAlbum(progressCallback, callback) {
+function downloadAlbum(album, progressCallback, callback) {
     var start = Date.now();
-    loadAlbum(function (album, err) {
-        if (err) {
-            console.error(err);
-        } else {
-            console.log('Loaded', album.title, 'with', album.list.length, 'records');
+    var ids = [];
+    for (var i = 0; i < album.list.length; i++) {
+        ids.push(album.list[i][1] + '_' + album.list[i][0])
+    }
 
-            var ids = [];
-            for (var i = 0; i < album.list.length; i++) {
-                ids.push(album.list[i][1] + '_' + album.list[i][0])
-            }
+    var total = ids.length;
+    var totalLoaded = 0;
+    var music = [];
 
-            var total = ids.length;
-            var totalLoaded = 0;
-            var music = [];
-
-            loadRecords(ids, function(loaded) {
-                music = music.concat(loaded);
-                totalLoaded += loaded.length;
-                progressCallback(totalLoaded, total);
-                if (totalLoaded == total) {
-                    console.log('Downloaded', music.length, 'records in', Date.now() - start, 'ms');
-                    callback(album.title, music);
-                }
-            });
+    loadRecords(ids, function(loaded) {
+        music = music.concat(loaded);
+        totalLoaded += loaded.length;
+        progressCallback(totalLoaded, total);
+        if (totalLoaded == total) {
+            console.log('Downloaded', music.length, 'records in', Date.now() - start, 'ms');
+            callback(album.title, music);
         }
     });
 }
@@ -195,8 +163,11 @@ function createPlaylist(title, records) {
     URL.revokeObjectURL(url);
 }
 
-function addMusicButtons() {
-    if (!isMusicPage()) return;
+function addMusicButtons(album) {
+    if (!document.getElementsByClassName('audio_rows')) {
+        console.log('No audio rows');
+        return;
+    }
 
     var a = document.createElement('a');
     var downloadText = document.createTextNode('Download playlist');
@@ -216,17 +187,13 @@ function addMusicButtons() {
         }
 
         a.className = 'flat_button secondary';
-        downloadAlbum(function (loaded, total) {
+        downloadAlbum(album, function (loaded, total) {
             console.log('Downloading playlist... (' + loaded + '/' + total + ')');
         }, function (title, music) {
             createPlaylist(title, music);
             a.className = 'flat_button';
         });
     };
-}
-
-function isMusicPage() {
-    return !!getOwner();
 }
 
 function urlHandler() {
@@ -236,7 +203,7 @@ function urlHandler() {
     var detect = function(){
         if (that.oldUrl != document.URL) {
             that.oldUrl = document.URL;
-            addMusicButtons();
+            chrome.runtime.sendMessage({status: "updated"}, handleEvent);
         }
     };
 
@@ -245,5 +212,20 @@ function urlHandler() {
     }, 100);
 }
 
-addMusicButtons();
+function handleEvent(response) {
+    console.log(response.last ? 'Repeat the last request' : 'No requests were found');
+    if (response.last) {
+        console.log('Repeat', response.last);
+        repeatAlbumRequest(response.last.requestBody, function (album, err) {
+            if (err) {
+                console.error('Failed to repeat request')
+            } else {
+                console.log('Loaded', fixFilename(album.title), 'with', album.list.length, 'records');
+                addMusicButtons(album);
+            }
+        });
+    }
+}
+
 var urlDetection = new urlHandler();
+chrome.runtime.sendMessage({status: "ready"}, handleEvent);
