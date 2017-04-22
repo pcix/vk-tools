@@ -2,6 +2,12 @@ var baseUrl = 'https://vk.com';
 var audioUrl = baseUrl + '/al_audio.php';
 var bulkSize = 5;
 var pause = 60000;
+var replacements = {
+    "&amp;": "&",
+    "&quot;": '"',
+    "&lt;": "<",
+    "&gt;": ">"
+};
 
 function insertBefore(referenceNode, newNode) {
     referenceNode.parentNode.insertBefore(newNode, referenceNode);
@@ -12,24 +18,16 @@ function insertAfter(referenceNode, newNode) {
 }
 
 function fixFilename(str) {
-    var r = /&#([\d]{1,5});/gi;
-    str = str.replace(r, function (match, grp) {
-        return String.fromCharCode(parseInt(grp, 10)); } );
-    str = unescapeHTML(str);
     str = str.replace(/[\\\/\|\*\:\"\<\>\?]/gmi, " ").trim();
+    str = str.replace(/(&amp;|&quot;|&lt;|&gt;)/g, function (m) {
+        return replacements[m];
+    });
+    str = str.replace(/&#([0-9]{1,3});/gi, function (match, numStr) {
+        var num = parseInt(numStr, 10);
+        return String.fromCharCode(num);
+    });
     return str;
 }
-
-function unescapeHTML(str) {
-    return str.replace(/(&amp;|&quot;|&lt;|&gt;)/g, function (m) { return unescapeHTML.replacements[m]; });
-}
-
-unescapeHTML.replacements = {
-    "&amp;": "&",
-    "&quot;": '"',
-    "&lt;": "<",
-    "&gt;": ">"
-};
 
 function parseResponse(response) {
     var startIndex = response.indexOf('<!json>') + 7;
@@ -145,7 +143,7 @@ function downloadAlbum(album, progressCallback, callback) {
 function createPlaylist(title, records) {
     var playlist = "#EXTM3U";
     for (var i = 0; i < records.length; i++) {
-        playlist += "\n\n#EXTINF:-1," + records[i].filename;
+        playlist += "\n\n#EXTINF:-1," + fixFilename(records[i].filename);
         playlist += "\n" + records[i].url;
     }
     var blob = new Blob([playlist], {type : 'text/plain'});
