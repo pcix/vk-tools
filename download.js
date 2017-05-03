@@ -85,7 +85,7 @@ function loadChunks(chunks, totalSize, callback) {
     var chunk = chunks.shift();
     console.log('Load', totalSize - chunks.length, 'chunk from', totalSize);
     loadChunk(chunk, function(chunkResult) {
-        callback(chunkResult);
+        callback(chunkResult, chunks.length);
         if (chunks.length > 0) {
             loadChunks(chunks, totalSize, callback);
         }
@@ -129,11 +129,11 @@ function downloadAlbum(album, progressCallback, callback) {
     var totalLoaded = 0;
     var music = [];
 
-    loadRecords(ids, function(loaded) {
+    loadRecords(ids, function(loaded, remain) {
         music = music.concat(loaded);
         totalLoaded += loaded.length;
         progressCallback(totalLoaded, total);
-        if (totalLoaded == total) {
+        if (remain == 0) {
             console.log('Downloaded', music.length, 'records in', Date.now() - start, 'ms');
             callback(album.title, music);
         }
